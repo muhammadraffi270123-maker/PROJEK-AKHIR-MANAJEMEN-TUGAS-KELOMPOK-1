@@ -1,10 +1,3 @@
-"""
-TaskMaster - Aplikasi Manajemen Tugas (Desktop GUI)
-Tanpa fitur kategori.
-Deadline pakai date picker (klik kalender).
-Jalankan: python taskmaster_gui.py
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import json
