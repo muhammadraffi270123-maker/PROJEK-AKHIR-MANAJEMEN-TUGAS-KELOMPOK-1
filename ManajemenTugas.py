@@ -1,8 +1,7 @@
 """
 TaskMaster - Aplikasi Manajemen Tugas (Desktop GUI)
-Perbaikan:
-  - Kategori bisa dihapus (tugas terkait otomatis pindah ke kategori pertama)
-  - Deadline menggunakan date picker (klik kalender, tidak isi manual)
+Tanpa fitur kategori.
+Deadline pakai date picker (klik kalender).
 Jalankan: python taskmaster_gui.py
 """
 
@@ -20,7 +19,6 @@ DATA_FILE = "tasks_data.json"
 PRIORITY_LABEL = {"high": "Tinggi", "medium": "Sedang", "low": "Rendah"}
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 PRIORITY_COLOR = {"high": "#ef4444", "medium": "#f59e0b", "low": "#10b981"}
-DEFAULT_CATEGORIES = ["Umum", "Kerja", "Pribadi", "Belanja", "Belajar"]
 
 
 # =====================================================
@@ -30,15 +28,14 @@ class Storage:
     @staticmethod
     def load():
         if not os.path.exists(DATA_FILE):
-            return {"tasks": [], "categories": DEFAULT_CATEGORIES.copy()}
+            return {"tasks": []}
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 data.setdefault("tasks", [])
-                data.setdefault("categories", DEFAULT_CATEGORIES.copy())
                 return data
         except Exception:
-            return {"tasks": [], "categories": DEFAULT_CATEGORIES.copy()}
+            return {"tasks": []}
 
     @staticmethod
     def save(data):
@@ -78,8 +75,6 @@ def format_date(s):
 # DATE PICKER (custom, tanpa install library)
 # =====================================================
 class DatePicker(tk.Toplevel):
-    """Popup kalender sederhana untuk memilih tanggal."""
-
     def __init__(self, parent, initial=None, on_select=None):
         super().__init__(parent)
         self.title("Pilih Tanggal")
@@ -110,7 +105,6 @@ class DatePicker(tk.Toplevel):
         self.geometry(f"+{px}+{py}")
 
     def _build(self):
-        # Header navigasi bulan
         header = tk.Frame(self)
         header.pack(fill="x", padx=8, pady=8)
 
@@ -121,7 +115,6 @@ class DatePicker(tk.Toplevel):
         tk.Button(header, text="▶", command=self.next_month,
                   relief="flat", width=3).pack(side="right")
 
-        # Nama hari
         days_frame = tk.Frame(self)
         days_frame.pack(padx=8)
         for i, d in enumerate(["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]):
@@ -129,11 +122,9 @@ class DatePicker(tk.Toplevel):
             tk.Label(days_frame, text=d, width=4, font=("Segoe UI", 8, "bold"),
                      fg=fg).grid(row=0, column=i, pady=(0, 4))
 
-        # Grid tanggal
         self.grid_frame = tk.Frame(self)
         self.grid_frame.pack(padx=8, pady=(0, 8))
 
-        # Tombol bawah
         bottom = tk.Frame(self)
         bottom.pack(fill="x", padx=8, pady=(0, 8))
         tk.Button(bottom, text="Hari Ini", command=self.pick_today,
@@ -146,7 +137,6 @@ class DatePicker(tk.Toplevel):
         self._draw_calendar()
 
     def _draw_calendar(self):
-        # Bersihkan grid lama
         for w in self.grid_frame.winfo_children():
             w.destroy()
 
@@ -154,10 +144,8 @@ class DatePicker(tk.Toplevel):
                       "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
         self.month_label.config(text=f"{bulan_nama[self.month-1]} {self.year}")
 
-        # Senin=0 ... Minggu=6 → pakai calendar dengan Monday first
         cal = calendar.Calendar(firstweekday=0)
         weeks = cal.monthdayscalendar(self.year, self.month)
-
         today = date.today()
 
         for r, week in enumerate(weeks):
@@ -220,19 +208,14 @@ class TaskMasterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("📋 TaskMaster - Manajemen Tugas")
-        self.root.geometry("920x720")
+        self.root.geometry("920x700")
         self.root.minsize(700, 500)
 
         data = Storage.load()
         self.tasks = data["tasks"]
-        self.categories = data["categories"]
-
-        # Pastikan minimal ada 1 kategori
-        if not self.categories:
-            self.categories = ["Umum"]
 
         self._build_ui()
-        self.refresh_all()
+        self.refresh_tasks()
 
     # -------------------------------------------------
     # BUILD UI
@@ -247,8 +230,6 @@ class TaskMasterApp:
         tk.Button(header, text="⬇️ Export", command=self.export_data,
                   bg="#4f46e5", fg="white", relief="flat", padx=10).pack(side="right", padx=5, pady=12)
         tk.Button(header, text="⬆️ Import", command=self.import_data,
-                  bg="#4f46e5", fg="white", relief="flat", padx=10).pack(side="right", padx=5, pady=12)
-        tk.Button(header, text="⚙️ Kategori", command=self.open_category_manager,
                   bg="#4f46e5", fg="white", relief="flat", padx=10).pack(side="right", padx=5, pady=12)
 
         # === STATISTIK ===
@@ -289,21 +270,14 @@ class TaskMasterApp:
         tk.Label(row2, text="Prioritas:", bg="#f3f4f8").pack(side="left")
         self.priority_var = tk.StringVar(value="Sedang")
         ttk.Combobox(row2, textvariable=self.priority_var, state="readonly", width=10,
-                     values=["Tinggi", "Sedang", "Rendah"]).pack(side="left", padx=(4, 12))
+                     values=["Tinggi", "Sedang", "Rendah"]).pack(side="left", padx=(4, 16))
         self.prio_map = {"Tinggi": "high", "Sedang": "medium", "Rendah": "low"}
 
-        tk.Label(row2, text="Kategori:", bg="#f3f4f8").pack(side="left")
-        self.category_var = tk.StringVar()
-        self.category_combo = ttk.Combobox(row2, textvariable=self.category_var,
-                                          state="readonly", width=14)
-        self.category_combo.pack(side="left", padx=(4, 12))
-
-        # === DEADLINE PAKAI DATE PICKER ===
+        # Deadline dengan date picker
         tk.Label(row2, text="Deadline:", bg="#f3f4f8").pack(side="left")
         self.deadline_var = tk.StringVar(value="")
-        self.deadline_display = tk.Entry(row2, textvariable=self.deadline_var,
-                                         width=14, state="readonly")
-        self.deadline_display.pack(side="left", padx=(4, 2))
+        tk.Entry(row2, textvariable=self.deadline_var, width=14,
+                 state="readonly").pack(side="left", padx=(4, 2))
         tk.Button(row2, text="📅", command=self.open_date_picker,
                   relief="flat", bg="#e0e7ff", width=3).pack(side="left")
         tk.Button(row2, text="✕", command=lambda: self.deadline_var.set(""),
@@ -340,30 +314,23 @@ class TaskMasterApp:
         tk.Label(controls, text="🔍", bg="#f3f4f8").pack(side="left")
         self.search_var = tk.StringVar()
         self.search_var.trace("w", lambda *a: self.refresh_tasks())
-        tk.Entry(controls, textvariable=self.search_var, width=18).pack(side="left", padx=4)
+        tk.Entry(controls, textvariable=self.search_var, width=22).pack(side="left", padx=4)
 
-        tk.Label(controls, text="Status:", bg="#f3f4f8").pack(side="left", padx=(8, 2))
+        tk.Label(controls, text="Status:", bg="#f3f4f8").pack(side="left", padx=(12, 2))
         self.filter_status_var = tk.StringVar(value="Semua")
-        ttk.Combobox(controls, textvariable=self.filter_status_var, state="readonly", width=11,
+        ttk.Combobox(controls, textvariable=self.filter_status_var, state="readonly", width=12,
                      values=["Semua", "Aktif", "Selesai", "Terlambat"]).pack(side="left")
         self.filter_status_var.trace("w", lambda *a: self.refresh_tasks())
 
-        tk.Label(controls, text="Prioritas:", bg="#f3f4f8").pack(side="left", padx=(8, 2))
+        tk.Label(controls, text="Prioritas:", bg="#f3f4f8").pack(side="left", padx=(12, 2))
         self.filter_prio_var = tk.StringVar(value="Semua")
-        ttk.Combobox(controls, textvariable=self.filter_prio_var, state="readonly", width=9,
+        ttk.Combobox(controls, textvariable=self.filter_prio_var, state="readonly", width=10,
                      values=["Semua", "Tinggi", "Sedang", "Rendah"]).pack(side="left")
         self.filter_prio_var.trace("w", lambda *a: self.refresh_tasks())
 
-        tk.Label(controls, text="Kategori:", bg="#f3f4f8").pack(side="left", padx=(8, 2))
-        self.filter_cat_var = tk.StringVar(value="Semua")
-        self.filter_cat_combo = ttk.Combobox(controls, textvariable=self.filter_cat_var,
-                                            state="readonly", width=11)
-        self.filter_cat_combo.pack(side="left")
-        self.filter_cat_var.trace("w", lambda *a: self.refresh_tasks())
-
-        tk.Label(controls, text="Urut:", bg="#f3f4f8").pack(side="left", padx=(8, 2))
+        tk.Label(controls, text="Urut:", bg="#f3f4f8").pack(side="left", padx=(12, 2))
         self.sort_var = tk.StringVar(value="Terbaru")
-        ttk.Combobox(controls, textvariable=self.sort_var, state="readonly", width=11,
+        ttk.Combobox(controls, textvariable=self.sort_var, state="readonly", width=12,
                      values=["Terbaru", "Deadline", "Prioritas", "Judul A-Z"]).pack(side="left")
         self.sort_var.trace("w", lambda *a: self.refresh_tasks())
 
@@ -430,15 +397,12 @@ class TaskMasterApp:
             messagebox.showwarning("Peringatan", "Judul tidak boleh kosong!")
             return
 
-        deadline = self.deadline_var.get().strip()
-
         self.tasks.append({
             "id": uid(),
             "title": title,
             "description": self.desc_text.get("1.0", tk.END).strip(),
             "priority": self.prio_map[self.priority_var.get()],
-            "category": self.category_var.get() or self.categories[0],
-            "deadline": deadline,
+            "deadline": self.deadline_var.get().strip(),
             "done": False,
             "created_at": datetime.now().isoformat(),
             "subtasks": [
@@ -447,7 +411,6 @@ class TaskMasterApp:
             ],
         })
 
-        # Reset form
         self.title_entry.delete(0, tk.END)
         self.desc_text.delete("1.0", tk.END)
         self.deadline_var.set("")
@@ -509,7 +472,6 @@ class TaskMasterApp:
         q = self.search_var.get().strip().lower()
         f_stat = self.filter_status_var.get()
         f_prio = self.filter_prio_var.get()
-        f_cat = self.filter_cat_var.get()
 
         result = []
         for t in self.tasks:
@@ -522,8 +484,6 @@ class TaskMasterApp:
             if f_stat == "Terlambat" and not is_overdue(t):
                 continue
             if f_prio != "Semua" and t["priority"] != self.prio_map[f_prio]:
-                continue
-            if f_cat != "Semua" and t["category"] != f_cat:
                 continue
             result.append(t)
 
@@ -566,7 +526,6 @@ class TaskMasterApp:
         inner = tk.Frame(card, bg="white", padx=10, pady=8)
         inner.pack(side="left", fill="both", expand=True)
 
-        # Judul
         row = tk.Frame(inner, bg="white")
         row.pack(fill="x")
 
@@ -587,13 +546,10 @@ class TaskMasterApp:
         tk.Button(row, text="🗑️", command=lambda: self.delete_task(task["id"]),
                   bg="white", relief="flat").pack(side="right")
 
-        # Meta
         meta = tk.Frame(inner, bg="white")
         meta.pack(fill="x", pady=(4, 0))
         tk.Label(meta, text=f"🎯 {PRIORITY_LABEL[task['priority']]}",
                  bg="white", fg=border_color, font=("Segoe UI", 9)).pack(side="left", padx=(0, 10))
-        tk.Label(meta, text=f"📁 {task['category']}",
-                 bg="white", fg="#6b7280", font=("Segoe UI", 9)).pack(side="left", padx=(0, 10))
         if task.get("deadline"):
             color = "#ef4444" if is_late else "#6b7280"
             prefix = "⚠️ Terlambat: " if is_late else "📅 "
@@ -603,13 +559,11 @@ class TaskMasterApp:
             tk.Label(meta, text="✓ Selesai", bg="white", fg="#10b981",
                      font=("Segoe UI", 9, "bold")).pack(side="left")
 
-        # Deskripsi
         if task.get("description"):
             tk.Label(inner, text=task["description"], bg="white", fg="#6b7280",
                      font=("Segoe UI", 9), anchor="w", justify="left",
                      wraplength=700).pack(fill="x", pady=(4, 0))
 
-        # Subtasks
         if task["subtasks"]:
             st_frame = tk.Frame(inner, bg="#f9fafb", padx=8, pady=6)
             st_frame.pack(fill="x", pady=(6, 0))
@@ -647,96 +601,6 @@ class TaskMasterApp:
         self.stat_vars["late"].set(str(late))
 
     # -------------------------------------------------
-    # KATEGORI MANAGER (DIPERBAIKI - BISA HAPUS SEMUA)
-    # -------------------------------------------------
-    def open_category_manager(self):
-        win = tk.Toplevel(self.root)
-        win.title("Kelola Kategori")
-        win.geometry("400x450")
-        win.transient(self.root)
-
-        tk.Label(win, text="Daftar Kategori", font=("Segoe UI", 11, "bold")).pack(pady=8)
-        tk.Label(win, text="Menghapus kategori akan memindahkan tugas terkait\nke kategori pertama yang tersisa.",
-                 font=("Segoe UI", 8), fg="#6b7280").pack()
-
-        listbox = tk.Listbox(win, height=10, font=("Segoe UI", 10))
-        listbox.pack(fill="both", expand=True, padx=12, pady=8)
-
-        def refresh_list():
-            listbox.delete(0, tk.END)
-            for c in self.categories:
-                count = sum(1 for t in self.tasks if t["category"] == c)
-                suffix = f"  ({count} tugas)" if count else ""
-                listbox.insert(tk.END, c + suffix)
-
-        def add_cat():
-            name = entry.get().strip()
-            if not name:
-                return
-            if name in self.categories:
-                messagebox.showwarning("Peringatan", "Kategori sudah ada!")
-                return
-            self.categories.append(name)
-            entry.delete(0, tk.END)
-            refresh_list()
-            self.save_and_refresh()
-
-        def del_cat():
-            sel = listbox.curselection()
-            if not sel:
-                return
-            cat = self.categories[sel[0]]
-
-            # Cek apakah ini kategori terakhir
-            if len(self.categories) <= 1:
-                messagebox.showwarning("Peringatan",
-                    "Tidak bisa menghapus kategori terakhir.\n"
-                    "Tambahkan kategori lain dulu.")
-                return
-
-            # Hitung tugas terkait
-            used_count = sum(1 for t in self.tasks if t["category"] == cat)
-
-            # Konfirmasi
-            msg = f"Hapus kategori '{cat}'?"
-            if used_count > 0:
-                msg += (f"\n\n{used_count} tugas memakai kategori ini dan akan "
-                        f"dipindahkan ke kategori '{self.categories[0] if self.categories[0] != cat else self.categories[1]}'.")
-            if not messagebox.askyesno("Konfirmasi", msg):
-                return
-
-            # Cari kategori pengganti (yang bukan cat)
-            replacement = next(c for c in self.categories if c != cat)
-
-            # Pindahkan tugas terkait
-            for t in self.tasks:
-                if t["category"] == cat:
-                    t["category"] = replacement
-
-            # Hapus kategori
-            self.categories.remove(cat)
-
-            refresh_list()
-            self.save_and_refresh()
-
-            # Update filter jika filter sedang menunjuk kategori yang dihapus
-            if self.filter_cat_var.get() == cat:
-                self.filter_cat_var.set("Semua")
-
-        refresh_list()
-
-        row = tk.Frame(win)
-        row.pack(fill="x", padx=12, pady=6)
-        entry = tk.Entry(row)
-        entry.pack(side="left", fill="x", expand=True)
-        tk.Button(row, text="Tambah", command=add_cat,
-                  bg="#6366f1", fg="white", relief="flat").pack(side="left", padx=4)
-
-        tk.Button(win, text="🗑️ Hapus Kategori Terpilih", command=del_cat,
-                  bg="#ef4444", fg="white", relief="flat",
-                  font=("Segoe UI", 10, "bold")).pack(pady=(0, 12))
-
-    # -------------------------------------------------
     # EXPORT / IMPORT
     # -------------------------------------------------
     def export_data(self):
@@ -747,8 +611,7 @@ class TaskMasterApp:
         )
         if not path:
             return
-        data = {"tasks": self.tasks, "categories": self.categories,
-                "exported_at": datetime.now().isoformat()}
+        data = {"tasks": self.tasks, "exported_at": datetime.now().isoformat()}
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         messagebox.showinfo("Sukses", f"Data berhasil diekspor ke:\n{path}")
@@ -766,10 +629,6 @@ class TaskMasterApp:
                 "Import akan MENGGANTI data saat ini. Lanjutkan?"):
                 return
             self.tasks = data["tasks"]
-            if "categories" in data and data["categories"]:
-                self.categories = data["categories"]
-            if not self.categories:
-                self.categories = ["Umum"]
             self.save_and_refresh()
             messagebox.showinfo("Sukses", f"Berhasil import {len(self.tasks)} tugas!")
         except Exception as e:
@@ -779,21 +638,7 @@ class TaskMasterApp:
     # SAVE + REFRESH
     # -------------------------------------------------
     def save_and_refresh(self):
-        Storage.save({"tasks": self.tasks, "categories": self.categories})
-        self.refresh_all()
-
-    def refresh_all(self):
-        if not self.categories:
-            self.categories = ["Umum"]
-
-        self.category_combo["values"] = self.categories
-        if not self.category_var.get() or self.category_var.get() not in self.categories:
-            self.category_var.set(self.categories[0])
-
-        self.filter_cat_combo["values"] = ["Semua"] + self.categories
-        if self.filter_cat_var.get() not in ["Semua"] + self.categories:
-            self.filter_cat_var.set("Semua")
-
+        Storage.save({"tasks": self.tasks})
         self.refresh_tasks()
 
 
