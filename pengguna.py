@@ -173,7 +173,62 @@ class Pengguna:
         self.__pesan_terakhir = "Tugas berhasil dihapus."
         return True
 
+    from datetime import datetime
+
+
+class Pengguna:
+    # ... (semua kode kamu yang sudah ada) ...
+
     # ---------- cari tugas berdasarkan kata kunci ----------
+    def cari_tugas(self, kata_kunci):
+        kata_kunci = kata_kunci.strip().lower()
+        if kata_kunci == "":
+            self.__pesan_terakhir = "Kata kunci tidak boleh kosong."
+            return []
+
+        hasil = []
+        for tugas in self.__daftar_tugas:
+            if kata_kunci in tugas["judul"].lower() or kata_kunci in tugas["deskripsi"].lower():
+                hasil.append(tugas.copy())
+
+        if len(hasil) == 0:
+            self.__pesan_terakhir = "Tidak ada tugas yang cocok dengan kata kunci."
+        else:
+            self.__pesan_terakhir = "Ditemukan " + str(len(hasil)) + " tugas."
+        return hasil
+
+    def filter_tugas(self, status=None, prioritas=None):
+        if status is None and prioritas is None:
+            self.__pesan_terakhir = "Pilih minimal satu filter: status atau prioritas."
+            return []
+
+        hasil = []
+        for tugas in self.__daftar_tugas:
+            cocok_status = (status is None) or (tugas["status"] == status.strip().lower())
+            cocok_prioritas = (prioritas is None) or (tugas["prioritas"] == prioritas.strip().lower())
+            if cocok_status and cocok_prioritas:
+                hasil.append(tugas.copy())
+
+        if len(hasil) == 0:
+            self.__pesan_terakhir = "Tidak ada tugas yang cocok dengan filter."
+        else:
+            self.__pesan_terakhir = "Ditemukan " + str(len(hasil)) + " tugas."
+        return hasil
+
+    # ---------- cek tugas terlambat ----------
+    def tugas_terlambat(self):
+        hari_ini = datetime.now().strftime("%Y-%m-%d")
+        hasil = []
+        for tugas in self.__daftar_tugas:
+            if tugas["tenggat"] < hari_ini and tugas["status"] != "selesai":
+                hasil.append(tugas.copy())
+
+        if len(hasil) == 0:
+            self.__pesan_terakhir = "Tidak ada tugas yang terlambat."
+        else:
+            self.__pesan_terakhir = "Ada " + str(len(hasil)) + " tugas terlambat."
+        return hasil
+        
     def cari_tugas(self, kata_kunci):
         kata_kunci = kata_kunci.strip().lower()
         if kata_kunci == "":
