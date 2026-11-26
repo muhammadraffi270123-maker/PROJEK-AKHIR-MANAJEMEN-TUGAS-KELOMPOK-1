@@ -173,12 +173,6 @@ class Pengguna:
         self.__pesan_terakhir = "Tugas berhasil dihapus."
         return True
 
-    from datetime import datetime
-
-
-class Pengguna:
-    # ... (semua kode kamu yang sudah ada) ...
-
     # ---------- cari tugas berdasarkan kata kunci ----------
     def cari_tugas(self, kata_kunci):
         kata_kunci = kata_kunci.strip().lower()
@@ -197,51 +191,47 @@ class Pengguna:
             self.__pesan_terakhir = "Ditemukan " + str(len(hasil)) + " tugas."
         return hasil
 
+    # ---------- filter tugas berdasarkan status dan/atau prioritas ----------
     def filter_tugas(self, status=None, prioritas=None):
-        if status is None and prioritas is None:
-            self.__pesan_terakhir = "Pilih minimal satu filter: status atau prioritas."
-            return []
+        if status is not None:
+            status = status.strip().lower()
+            if status not in Pengguna.DAFTAR_STATUS:
+                self.__pesan_terakhir = "Status harus belum dikerjakan, sedang dikerjakan, atau selesai."
+                return []
+
+        if prioritas is not None:
+            prioritas = prioritas.strip().lower()
+            if prioritas not in Pengguna.DAFTAR_PRIORITAS:
+                self.__pesan_terakhir = "Prioritas harus rendah, sedang, atau tinggi."
+                return []
 
         hasil = []
         for tugas in self.__daftar_tugas:
-            cocok_status = (status is None) or (tugas["status"] == status.strip().lower())
-            cocok_prioritas = (prioritas is None) or (tugas["prioritas"] == prioritas.strip().lower())
-            if cocok_status and cocok_prioritas:
-                hasil.append(tugas.copy())
+            if status is not None and tugas["status"] != status:
+                continue
+            if prioritas is not None and tugas["prioritas"] != prioritas:
+                continue
+            hasil.append(tugas.copy())
 
         if len(hasil) == 0:
-            self.__pesan_terakhir = "Tidak ada tugas yang cocok dengan filter."
+            self.__pesan_terakhir = "Tidak ada tugas yang sesuai filter."
         else:
             self.__pesan_terakhir = "Ditemukan " + str(len(hasil)) + " tugas."
         return hasil
 
-    # ---------- cek tugas terlambat ----------
-    def tugas_terlambat(self):
+    # ---------- cek tugas yang terlambat ----------
+    def cek_terlambat(self):
+        # terlambat = tenggat sudah lewat dan status belum selesai
+        # format TTTT-BB-HH bisa dibandingkan langsung sebagai teks
         hari_ini = datetime.now().strftime("%Y-%m-%d")
+
         hasil = []
         for tugas in self.__daftar_tugas:
-            if tugas["tenggat"] < hari_ini and tugas["status"] != "selesai":
+            if tugas["status"] != "selesai" and tugas["tenggat"] < hari_ini:
                 hasil.append(tugas.copy())
 
         if len(hasil) == 0:
             self.__pesan_terakhir = "Tidak ada tugas yang terlambat."
         else:
-            self.__pesan_terakhir = "Ada " + str(len(hasil)) + " tugas terlambat."
-        return hasil
-        
-    def cari_tugas(self, kata_kunci):
-        kata_kunci = kata_kunci.strip().lower()
-        if kata_kunci == "":
-            self.__pesan_terakhir = "Kata kunci tidak boleh kosong."
-            return []
-
-        hasil = []
-        for tugas in self.__daftar_tugas:
-            if kata_kunci in tugas["judul"].lower() or kata_kunci in tugas["deskripsi"].lower():
-                hasil.append(tugas.copy())
-
-        if len(hasil) == 0:
-            self.__pesan_terakhir = "Tidak ada tugas yang cocok dengan kata kunci."
-        else:
-            self.__pesan_terakhir = "Ditemukan " + str(len(hasil)) + " tugas."
+            self.__pesan_terakhir = "Ada " + str(len(hasil)) + " tugas yang terlambat."
         return hasil
